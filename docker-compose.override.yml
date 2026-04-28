@@ -1,0 +1,30 @@
+# docker-compose.override.yml
+# Applied automatically on top of docker-compose.yml during local development.
+# Enables hot-reload for the backend and skips the frontend build.
+# NOT used in CI or production (pass -f docker-compose.yml explicitly there).
+
+version: "3.9"
+
+services:
+  backend:
+    # Mount source so code changes reflect without rebuilding
+    volumes:
+      - ./backend/app:/app/app
+      - ./ai-services:/ai-services:ro
+      - hardhat_artifacts:/blockchain/artifacts:ro
+    environment:
+      DEBUG: "true"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+
+  frontend:
+    # In dev, skip the multi-stage build and run next dev instead
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
