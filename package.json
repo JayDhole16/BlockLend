@@ -1,0 +1,19 @@
+{
+  "name": "nakshatra-lending",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Decentralized P2P lending platform — Hardhat · FastAPI · Next.js · PostgreSQL",
+  "scripts": {
+    "dev:all":            "powershell -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
+    "blockchain:start":   "powershell -ExecutionPolicy Bypass -File scripts/start-blockchain.ps1",
+    "blockchain:deploy":  "powershell -ExecutionPolicy Bypass -File scripts/deploy-contracts.ps1",
+    "blockchain:seed":    "powershell -ExecutionPolicy Bypass -File scripts/seed-wallets.ps1",
+    "backend:start":      "powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1",
+    "frontend:start":     "powershell -ExecutionPolicy Bypass -File scripts/start-frontend.ps1",
+    "blockchain:compile": "cd blockchain && npx hardhat compile",
+    "blockchain:test":    "cd blockchain && npx hardhat test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

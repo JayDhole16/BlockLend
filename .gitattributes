@@ -1,0 +1,34 @@
+# Normalize line endings to LF in the repo, checkout as-is on all platforms.
+# This prevents the LF→CRLF warnings on Windows and keeps diffs clean.
+
+* text=auto eol=lf
+
+# Force LF for shell scripts (CRLF breaks sh/bash on Linux/Docker)
+*.sh text eol=lf
+
+# Force LF for all source files
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.json text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sol  text eol=lf
+*.py   text eol=lf
+*.txt  text eol=lf
+*.env  text eol=lf
+
+# Binaries — no line ending conversion
+*.pkl    binary
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.svg    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.node   binary

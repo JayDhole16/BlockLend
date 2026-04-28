@@ -1,0 +1,122 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nakshatra
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── IPFS ────────────────────────────────────────────────────────────────────
+  ipfs:
+    image: ipfs/kubo:latest
+    restart: unless-stopped
+    ports:
+      - "4001:4001"   # swarm
+      - "5001:5001"   # API
+      - "8080:8080"   # gateway
+    volumes:
+      - ipfs_data:/data/ipfs
+
+  # ── Hardhat blockchain node ──────────────────────────────────────────────────
+  hardhat:
+    image: node:20-alpine
+    working_dir: /blockchain
+    command: sh -c "npm install --silent && npx hardhat node --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./blockchain:/blockchain
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --post-data='{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' --header='Content-Type: application/json' http://localhost:8545 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ── Contract deployer (runs once after hardhat is ready) ────────────────────
+  deployer:
+    image: node:20-alpine
+    working_dir: /blockchain
+    command: sh -c "npm install --silent && npx hardhat run scripts/deploy.js --network localhost"
+    volumes:
+      - ./blockchain:/blockchain
+    depends_on:
+      hardhat:
+        condition: service_healthy
+    environment:
+      - HARDHAT_NETWORK=localhost
+    restart: "no"
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Override localhost URLs to use Docker service names
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nakshatra
+      RPC_URL: http://hardhat:8545
+      IPFS_API_URL: http://ipfs:5001
+      # Copy remaining vars from .env file
+      APP_NAME: "Nakshatra Lending API"
+      DEBUG: "false"
+      CHAIN_ID: "31337"
+      USDC_ADDRESS: ${USDC_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+      USER_PROFILE_NFT_ADDRESS: ${USER_PROFILE_NFT_ADDRESS:-0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512}
+      LOAN_FACTORY_ADDRESS: ${LOAN_FACTORY_ADDRESS:-0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0}
+      ESCROW_ADDRESS: ${ESCROW_ADDRESS:-0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9}
+      REPUTATION_ADDRESS: ${REPUTATION_ADDRESS:-0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: "1440"
+      PINATA_API_KEY: ${PINATA_API_KEY:-}
+      PINATA_SECRET_KEY: ${PINATA_SECRET_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hardhat:
+        condition: service_healthy
+    volumes:
+      # Mount blockchain artifacts so backend can read ABIs
+      - ./blockchain/artifacts:/blockchain/artifacts:ro
+      # Mount ai-services for model files
+      - ./ai-services:/ai-services:ro
+
+  # ── Next.js frontend ─────────────────────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    working_dir: /frontend
+    command: sh -c "npm install --silent && npm run build && npm start"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/frontend
+      - /frontend/node_modules
+      - /frontend/.next
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+      NEXT_PUBLIC_USDC_ADDRESS: ${USDC_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+      NEXT_PUBLIC_LOAN_FACTORY_ADDRESS: ${LOAN_FACTORY_ADDRESS:-0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0}
+      NEXT_PUBLIC_ESCROW_ADDRESS: ${ESCROW_ADDRESS:-0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  ipfs_data:
